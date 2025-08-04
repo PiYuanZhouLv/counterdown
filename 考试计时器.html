@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>考试计时器</title>
+        <style>
+            button:hover{
+                opacity: 0.8;
+            }
+        </style>
+    </head>
+    <body style="overflow: hidden; text-align: center; user-select: none;">
+        <button style="z-index: 998;position: fixed; top: 0; right: 0; margin: 10px; padding: 5px; font-size: min(2vw, 3vh); background-color: #ffcc80; border-radius: 5px;" onclick="open_config()">设置</button>
+        <button style="z-index: 998;position: fixed; top: 0; left: 0; margin: 10px; padding: 5px; font-size: min(2vw, 3vh); background-color: #acff80; border-radius: 5px;" onclick="getTimeAtOnce()">立刻校时</button>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; top: 45vh; transform: translateY(-50%); position: absolute; width: 100%;">
+            <div id="name" style="font-size: min(8vw, 12vh); width: 100%; overflow: hidden; color: #f57f17;">考试名称</div>
+            <div id="time" style="font-size: min(15vw, 22.5vh); color: #64b5f6;">11:45:14</div>
+            <div id="bar" style="height: min(5vh, calc(10vw / 3)); background-color: aquamarine; width: 80vw; border: 1px black solid; border-radius: 20px;"></div>
+            <div id="left" style="font-size: min(5vw, 7.5vh); color: #81c784;">考试还剩1919:08:10</div>
+            <div id="status" style="font-size: min(2vw, 3vh);"></div>
+        </div>
+        <div id="config" style="display: none;width: 100%; height: 100%; position: fixed; z-index: 999; background-color: rgba(0, 0, 0, 0.3); top: 0; left: 0;right: 0;bottom: 0;">
+            <style>
+                #plan>tr>td,#plan>tr>th{
+                    text-wrap: nowrap;
+                }
+                .blue{
+                    background-color: #4350ff; color: white; border: none; border-radius: 5px;
+                }
+                .red{
+                    background-color: red; color: white; border: none; border-radius: 5px;
+                }
+            </style>
+            <div style="position: absolute;top: 50vh;left: 50vw; transform: translate(-50%, -50%); background-color: white; padding: 50px;">
+                <h3 style="margin: 0;">考试计划</h3>
+                <button style="position: absolute; top: 10px;right: 10px;" onclick="close_config()">X</button>
+                <div>
+                    <table id="plan">
+                        <tr>
+                            <th>考试名称</th>
+                            <th>考试日期</th>
+                            <th>开始时间</th>
+                            <th>结束时间</th>
+                            <th>修改</th>
+                            <th>删除</th>
+                        </tr>
+                        <tr>
+                            <td>语文</td>
+                            <td>1919/8/10</td>
+                            <td>11:45:14</td>
+                            <td>11:45:14</td>
+                            <td><button class="blue">修改</button></td>
+                            <td><button class="red">删除</button></td>
+                        </tr>
+                        <tr>
+                            <td>语文</td>
+                            <td>1919/8/10</td>
+                            <td>11:45:14</td>
+                            <td>11:45:14</td>
+                            <td><button class="blue">修改</button></td>
+                            <td><button class="red">删除</button></td>
+                        </tr>
+                    </table>
+                    <button style="width: 100%; background-color: transparent; border: none; color: #64b5f6; font-size: 20px;" onclick="new_event()">+新增考试</button>
+                </div>
+            </div>
+        </div>
+        <script>
+            var BJToffset;
+            // Failed because of CORS.
+            // Update: Use allorigins to passby the CORS rule.
+            async function getBeijingTime(){
+                document.getElementById('status').innerText = `正在授时……`
+                document.getElementById('status').style.color = 'blue'
+                try{
+                    var st = performance.now()
+                    time = new Date(JSON.parse((JSON.parse(await (await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent('https://sapi.chinattas.com/time-serv')}`, {cache:"no-store"})).text()))['contents'])['sysTime2']).getTime()
+                    var et = performance.now()
+                    BJToffset = time - ((st+et)/2)
+                    if(isNaN(BJToffset)){
+                        throw new Error("授时失败");
+                    }
+                    document.getElementById('status').innerText = `授时成功！上次授时时间：${now().toLocaleTimeString()}，网络延时：${(et-st).toFixed(1)}ms`
+                    document.getElementById('status').style.color = 'green'
+                }catch{
+                    document.getElementById('status').innerText = `授时失败！使用上次授时时间或本地时间。上一次尝试：${now().toLocaleTimeString()}`
+                    document.getElementById('status').style.color = 'red'
+                }
+            }
+            var getTimeItv;
+            function getTimeAtOnce(){
+                if(getTimeItv){
+                    clearInterval(getTimeItv)
+                }
+                getBeijingTime()
+                getTimeItv = setInterval(getBeijingTime, 10*60*1000)
+            }
+            getTimeAtOnce()
+            function now(){
+                if(BJToffset){
+                    return new Date(performance.now()+BJToffset)
+                }else{
+                    return new Date()
+                }
+            }
+            function update(){
+                var nt = now()
+                var pad = (s) => (s.toString().padStart(2, '0'))
+                document.getElementById('time').innerText = `${pad(nt.getHours())}:${pad(nt.getMinutes())}:${pad(nt.getSeconds())}`
+            }
+            setInterval(update, 10);
+            var events = []
+            function load(){
+                events = JSON.parse(localStorage.getItem('examEvent')||"[]").map((evt)=>([evt[0], new Date(evt[1]), new Date(evt[2])]))
+            }
+            load()
+            function save(){
+                localStorage.setItem('examEvent', JSON.stringify(events.map((evt)=>([evt[0], evt[1].getTime(), evt[2].getTime()]))))
+            }
+            function st(dt){
+                if(dt<60*1000){
+                    return `${(dt/1000).toFixed(1)}s`
+                }else if(dt<60*60*1000){
+                    return `${Math.floor(dt/1000/60).toString().padStart(2, '0')}:${(Math.floor(dt/1000)%60).toString().padStart(2, '0')}`
+                }else{
+                    return `${Math.floor(dt/1000/60/60).toString().padStart(2, '0')}:${(Math.floor(dt/1000/60)%60).toString().padStart(2, '0')}:${(Math.floor(dt/1000)%60).toString().padStart(2, '0')}`
+                }
+            }
+            function progress(){
+                var bar = document.getElementById('bar')
+                var left = document.getElementById('left')
+                var name = document.getElementById('name')
+                var event = filter_and_now()
+                if(!event){
+                    bar.style.background = 'transparent'
+                    left.innerText = '暂无考试计划'
+                    name.innerText = '考试计时器'
+                }else if(now()<event[1]){
+                    bar.style.background = 'transparent'
+                    left.innerText = `距离考试开始还有${st(event[1]-now())}`
+                    name.innerText = event[0]
+                }else{
+                    bar.style.background = `linear-gradient(to right, aquamarine 0 ${((now() - event[1])/(event[2]-event[1]))*100}%, transparent ${((now() - event[1])/(event[2]-event[1]))*100}% 100%)`
+                    left.innerText = `距离考试结束还有${st(event[2]-now())}`
+                }
+            }
+            setInterval(progress, 10)
+            function filter_and_now(){
+                events = events.filter((evt)=>(evt[2]>now())).sort((a, b)=>(a[1]-b[1]))
+                return events[0]
+            }
+            var configEventMap;
+            var newid;
+            function open_config(){
+                document.getElementById('plan').innerHTML = `
+                        <tr>
+                            <th>考试名称</th>
+                            <th>考试日期</th>
+                            <th>开始时间</th>
+                            <th>结束时间</th>
+                            <th>修改</th>
+                            <th>删除</th>
+                        </tr>`
+                newid = 0
+                configEventMap = {}
+                for (const line of events) {
+                    var nid = newid
+                    newid++
+                    configEventMap[nid] = line
+                    var tr = document.createElement('tr')
+                    render_event(tr, nid)
+                    document.getElementById('plan').appendChild(tr)
+                }
+                document.getElementById('config').style.display=''
+            }
+            function close_config(){
+                events = Object.values(configEventMap)
+                save()
+                document.getElementById('config').style.display='none'
+            }
+            function correctDT(wrong){
+                return new Date(wrong.getTime()+wrong.getTimezoneOffset()*60*1000)
+            }
+            function messupDT(right){
+                return new Date(right.getTime()-right.getTimezoneOffset()*60*1000)
+            }
+            function render_event(tr, nid){
+                tr.innerHTML = ''
+                var td1 = document.createElement('td')
+                td1.innerText = configEventMap[nid][0]
+                tr.appendChild(td1)
+                var td2 = document.createElement('td')
+                td2.innerText = configEventMap[nid][1].toLocaleDateString()
+                tr.appendChild(td2)
+                var td3 = document.createElement('td')
+                td3.innerText = configEventMap[nid][1].toLocaleTimeString()
+                tr.appendChild(td3)
+                var td4 = document.createElement('td')
+                td4.innerText = configEventMap[nid][2].toLocaleTimeString()
+                tr.appendChild(td4)
+                var td5 = document.createElement('td')
+                var editBtn = document.createElement('button')
+                editBtn.classList.add('blue')
+                editBtn.innerText = '修改'
+                editBtn.onclick = () => {edit_event(tr, nid)}
+                td5.appendChild(editBtn)
+                tr.appendChild(td5)
+                var td6 = document.createElement('td')
+                var removeBtn = document.createElement('button')
+                removeBtn.classList.add('red')
+                removeBtn.innerText = '删除'
+                removeBtn.onclick = () => {
+                    if(confirm(`确认删除考试"${configEventMap[nid][0].slice(0, 5)}"吗？该操作无法删除！`)){
+                        delete configEventMap[nid]
+                        tr.remove()
+                    }
+                }
+                td6.appendChild(removeBtn)
+                tr.appendChild(td6)
+            }
+            function mixDateAndTime(date, time){
+                return new Date(`${date.toLocaleDateString()} ${time.toLocaleTimeString()}`)
+            }
+            function edit_event(tr, nid){
+                tr.innerHTML = ''
+                var td1 = document.createElement('td')
+                var nameIpt = document.createElement('input')
+                nameIpt.value = configEventMap[nid][0]
+                td1.appendChild(nameIpt)
+                tr.appendChild(td1)
+                var td2 = document.createElement('td')
+                var dateIpt = document.createElement('input')
+                dateIpt.type = 'date'
+                if(configEventMap[nid][1]){
+                dateIpt.valueAsDate = messupDT(configEventMap[nid][1])
+                }
+                td2.appendChild(dateIpt)
+                tr.appendChild(td2)
+                var td3 = document.createElement('td')
+                var stimeIpt = document.createElement('input')
+                stimeIpt.type = 'time'
+                if(configEventMap[nid][1]){
+                stimeIpt.valueAsDate = messupDT(configEventMap[nid][1])
+                }
+                td3.appendChild(stimeIpt)
+                tr.appendChild(td3)
+                var td4 = document.createElement('td')
+                var etimeIpt = document.createElement('input')
+                etimeIpt.type = 'time'
+                if(configEventMap[nid][2]){
+                etimeIpt.valueAsDate = messupDT(configEventMap[nid][2])
+                }
+                td4.appendChild(etimeIpt)
+                tr.appendChild(td4)
+                var td5 = document.createElement('td')
+                var okBtn = document.createElement('button')
+                okBtn.classList.add('blue')
+                okBtn.innerText = '确定'
+                okBtn.onclick = () => {
+                    configEventMap[nid][0] = nameIpt.value
+                    configEventMap[nid][1] = mixDateAndTime(correctDT(dateIpt.valueAsDate), correctDT(stimeIpt.valueAsDate))
+                    configEventMap[nid][2] = mixDateAndTime(correctDT(dateIpt.valueAsDate), correctDT(etimeIpt.valueAsDate))
+                    render_event(tr, nid)
+                }
+                td5.appendChild(okBtn)
+                tr.appendChild(td5)
+                var td6 = document.createElement('td')
+                var removeBtn = document.createElement('button')
+                removeBtn.classList.add('red')
+                removeBtn.innerText = '删除'
+                removeBtn.onclick = () => {
+                    if(confirm(`确认删除考试"${configEventMap[nid][0].slice(0, 5)}"吗？该操作无法删除！`)){
+                        delete configEventMap[nid]
+                        tr.remove()
+                    }
+                }
+                td6.appendChild(removeBtn)
+                tr.appendChild(td6)
+            }
+            function new_event(){
+                var nid = newid
+                newid++
+                configEventMap[nid] = ['考试名称', null, null]
+                var tr = document.createElement('tr')
+                edit_event(tr, nid)
+                document.getElementById('plan').appendChild(tr)
+            }
+        </script>
+    </body>
+</html>
