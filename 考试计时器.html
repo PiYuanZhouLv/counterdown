@@ -141,6 +141,7 @@
                 }else{
                     bar.style.background = `linear-gradient(to right, aquamarine 0 ${((now() - event[1])/(event[2]-event[1]))*100}%, transparent ${((now() - event[1])/(event[2]-event[1]))*100}% 100%)`
                     left.innerText = `距离考试结束还有${st(event[2]-now())}`
+                    name.innerText = event[0]
                 }
             }
             setInterval(progress, 10)
